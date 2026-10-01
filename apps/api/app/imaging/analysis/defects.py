@@ -145,15 +145,14 @@ def detect_defects(
             )
 
     # --- holes ---------------------------------------------------------------------------
-    # Several enclosed "holes" close to each other are letter counters or a print, not damage.
-    holes = list(holes or [])
-    isolated = [
-        hb for hb in holes
-        if not any(o is not hb and np.hypot(o.cx - hb.cx, o.cy - hb.cy) < 0.08 for o in holes)
-    ]
-    for hb in isolated:
+    # Background-coloured regions enclosed by the garment. Letter counters of a print are
+    # enclosed too, but they are surrounded by ink rather than by the fabric itself.
+    garment_lab = np.median(lab[interior > 0], axis=0) if interior.any() else None
+    for hb in holes or []:
+        if garment_lab is not None and _inside_print(lab, hb, garment_lab, garment):
+            continue
         defects.append(
-            Defect(id=uuid.uuid4().hex[:10], kind="hole", label=LABELS["hole"], bbox=hb, confidence=0.5, area=hb.w * hb.h)
+            Defect(id=uuid.uuid4().hex[:10], kind="hole", label=LABELS["hole"], bbox=hb, confidence=0.6, area=hb.w * hb.h)
         )
 
     # --- wear / pilling: unusual fine-texture energy without structure --------------------
@@ -227,7 +226,8 @@ def _detect_wear(lab: np.ndarray, interior: np.ndarray, specks: list[Speck], s: 
 def _merge(defects: list[Defect]) -> list[Defect]:
     """Merge fragments of the same zone; keep the most confident; cap the list."""
     defects = [d for d in defects if d.kind not in ("stain", "discoloration") or d.confidence >= MIN_REPORT_CONFIDENCE]
-    defects.sort(key=lambda d: -d.confidence)
+    # a hole is the most specific finding: it wins over a colour anomaly at the same place
+    defects.sort(key=lambda d: (d.kind != "hole", -d.confidence))
     merged: list[Defect] = []
     for d in defects:
         target = next((m for m in merged if _near(m.bbox, d.bbox)), None)
@@ -252,6 +252,24 @@ def _union(a: BBox, b: BBox) -> BBox:
     x0, y0 = min(a.x, b.x), min(a.y, b.y)
     x1, y1 = max(a.x + a.w, b.x + b.w), max(a.y + a.h, b.y + b.h)
     return BBox(x0, y0, x1 - x0, y1 - y0)
+
+
+def _inside_print(lab: np.ndarray, hb: BBox, garment_lab: np.ndarray, garment: np.ndarray) -> bool:
+    """A real hole is surrounded by the garment's own fabric; a letter counter by print ink."""
+    h, w = garment.shape
+    x0, y0 = int(hb.x * w), int(hb.y * h)
+    x1, y1 = int((hb.x + hb.w) * w) + 1, int((hb.y + hb.h) * h) + 1
+    pad = max(3, int(0.6 * max(x1 - x0, y1 - y0)))
+    X0, Y0, X1, Y1 = max(0, x0 - pad), max(0, y0 - pad), min(w, x1 + pad), min(h, y1 + pad)
+    ring = np.ones((Y1 - Y0, X1 - X0), bool)
+    ring[y0 - Y0 : y1 - Y0, x0 - X0 : x1 - X0] = False
+    ring &= garment[Y0:Y1, X0:X1] > 0
+    if ring.sum() < 8:
+        return False
+    vals = lab[Y0:Y1, X0:X1][ring]
+    # fraction of the ring that is far from the fabric colour (strokes of a print / letters)
+    d = np.sqrt((((vals - garment_lab) * np.array([0.5, 1.0, 1.0])) ** 2).sum(axis=1))
+    return float(np.mean(d > 18.0)) > 0.2
 
 
 def protected_speck_ids(defects: list[Defect]) -> set[int]:

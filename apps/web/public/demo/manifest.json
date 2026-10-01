@@ -1,0 +1,50 @@
+[
+  {
+    "name": "hoodie",
+    "intensity": "naturel",
+    "garment": "Hoodie",
+    "quality_before": 58,
+    "quality_after": 74,
+    "fidelity": 94,
+    "defects": 2,
+    "specks_removed": 11,
+    "width": 900,
+    "height": 1200
+  },
+  {
+    "name": "sneakers",
+    "intensity": "premium",
+    "garment": "Sneakers",
+    "quality_before": 64,
+    "quality_after": 74,
+    "fidelity": 97,
+    "defects": 0,
+    "specks_removed": 7,
+    "width": 859,
+    "height": 1145
+  },
+  {
+    "name": "jean",
+    "intensity": "naturel",
+    "garment": "Jean",
+    "quality_before": 55,
+    "quality_after": 70,
+    "fidelity": 94,
+    "defects": 1,
+    "specks_removed": 13,
+    "width": 900,
+    "height": 1200
+  },
+  {
+    "name": "veste",
+    "intensity": "studio",
+    "garment": "Veste",
+    "quality_before": 63,
+    "quality_after": 72,
+    "fidelity": 91,
+    "defects": 1,
+    "specks_removed": 14,
+    "width": 844,
+    "height": 1125
+  }
+]

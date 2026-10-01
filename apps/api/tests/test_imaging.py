@@ -124,6 +124,17 @@ def test_stain_is_reported_as_possible_defect(category):
     assert any(abs(d.bbox.cx - sb.cx) < 0.04 and abs(d.bbox.cy - sb.cy) < 0.04 for d in b.analysis.defects)
 
 
+@pytest.mark.parametrize("category", ["hoodie", "tshirt"])
+def test_real_hole_is_reported_but_print_counters_are_not(category):
+    img, truth = make_scene(category, seed=5, hole=True)
+    b = analyze(img, local_router())
+    hb = truth.hole_bbox
+    holes = [d for d in b.analysis.defects if d.kind == "hole"]
+    assert any(abs(d.bbox.cx - hb.cx) < 0.03 and abs(d.bbox.cy - hb.cy) < 0.03 for d in holes), holes
+    # letters of the "ENHANCE" print enclose background-coloured counters: never reported as holes
+    assert len(holes) == 1
+
+
 @pytest.mark.parametrize("category,expected", [("hoodie", "hoodie"), ("jean", "jean"), ("tshirt", "tshirt"), ("sneakers", "sneakers"), ("veste", "veste")])
 def test_clothing_category(category, expected):
     _, _, b = analysed(category)

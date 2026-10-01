@@ -39,6 +39,7 @@ class SceneTruth:
     garment_specks: list[tuple[float, float]]
     tilt_deg: float
     cast_gains: tuple[float, float, float]
+    hole_bbox: BBox | None = None
     details: dict = field(default_factory=dict)
 
 
@@ -324,6 +325,7 @@ def make_scene(
     dust: int = 14,
     hairs: int = 2,
     stain: bool = True,
+    hole: bool = False,
     noise: float = 0.012,
     jpeg_quality: int = 86,
     logo: str = "ENHANCE",
@@ -391,6 +393,16 @@ def make_scene(
             stain_color = np.array([0.42, 0.40, 0.36], np.float32)
         garment = garment * (1 - 0.65 * blob[..., None]) + stain_color * 0.65 * blob[..., None] * g_shade[..., None]
         stain_bbox_canvas = (sx - 1.6 * r, sy - 1.4 * r, 3.4 * r, 2.8 * r)
+
+    hole_canvas = None
+    if hole:
+        # a small tear through the fabric: the surface underneath shows through
+        hx, hy = cv.pt(*meta["garment_points"][0])
+        hr = 15 * cv.px_per_unit
+        tear = np.zeros(mask.shape, np.float32)
+        cv2.ellipse(tear, (int(hx), int(hy)), (int(hr * 1.3), int(hr)), 20, 0, 360, 1.0, -1, cv2.LINE_AA)
+        mask = mask * (1 - tear)
+        hole_canvas = (hx - hr * 1.4, hy - hr * 1.4, hr * 2.8, hr * 2.8)
 
     scene = bg * bg_shade[..., None] * (1 - mask[..., None]) + garment * mask[..., None]
 
@@ -484,6 +496,13 @@ def make_scene(
         cy_ = [c[1] for c in corners]
         stain_bbox = BBox(min(cx_), min(cy_), max(cx_) - min(cx_), max(cy_) - min(cy_))
 
+    hole_bbox = None
+    if hole_canvas:
+        hx0, hy0, hw, hh = hole_canvas
+        corners = [tr(hx0, hy0), tr(hx0 + hw, hy0 + hh)]
+        hole_bbox = BBox(min(c[0] for c in corners), min(c[1] for c in corners),
+                         abs(corners[1][0] - corners[0][0]), abs(corners[1][1] - corners[0][1]))
+
     specks_n = [tr(px, py) for px, py, _ in speck_pts]
     garment_specks = [tr(px, py) for px, py, g in speck_pts if g]
     truth = SceneTruth(
@@ -495,6 +514,7 @@ def make_scene(
         garment_specks=[p for p in garment_specks if 0 <= p[0] <= 1 and 0 <= p[1] <= 1],
         tilt_deg=tilt,
         cast_gains=cast,
+        hole_bbox=hole_bbox,
         details={k: [tr(*cv.pt(*p)) for p in v] for k, v in meta.items() if k == "rivets"},
     )
     return img, truth

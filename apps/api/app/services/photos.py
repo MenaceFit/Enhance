@@ -102,7 +102,9 @@ def create_photo(db: Session, user: User, project: Project, position: int, filen
     prefix = f"{user_prefix(user.id)}photos/{pid}/"
     ext = {"jpeg": "jpg"}.get(fmt, fmt)
     key = f"{prefix}original.{ext}"
-    get_storage().put(key, data)
+    st = get_storage()
+    st.put(key, data)
+    thumb_key = _quick_thumbnail(st, prefix, data)
     photo = Photo(
         id=pid,
         user_id=user.id,
@@ -116,10 +118,32 @@ def create_photo(db: Session, user: User, project: Project, position: int, filen
         status="queued",
         storage_prefix=prefix,
         original_key=key,
+        thumb_key=thumb_key,
         expires_at=datetime.now(UTC) + retention_for(user),
     )
     db.add(photo)
     return photo
+
+
+def _quick_thumbnail(st, prefix: str, data: bytes) -> str | None:
+    """Small preview stored at upload so the processing screen shows the photo at once.
+
+    JPEG decoding uses Pillow's draft mode (DCT scaling), so this costs a few ms.
+    """
+    from PIL import ImageOps
+
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            im.draft("RGB", (640, 640))
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            im.thumbnail((get_settings().thumbnail_long_side,) * 2)
+            buf = io.BytesIO()
+            im.save(buf, "WEBP", quality=78)
+        key = f"{prefix}thumb.webp"
+        st.put(key, buf.getvalue(), "image/webp")
+        return key
+    except Exception:
+        return None
 
 
 # --- render sources (cached for snappy editor previews) ------------------------------------

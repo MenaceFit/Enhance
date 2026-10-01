@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+/* Quiet luxury palette: ink, paper and a few greys. Colour is reserved for
+   meaning (a muted amber for warnings, a muted green for confirmations). */
+@theme {
+  --color-ink: #0b0b0c;
+  --color-ink-soft: #1c1c1e;
+  --color-graphite: #3a3a3c;
+  --color-muted: #6e6e73;
+  --color-subtle: #a1a1a6;
+  --color-line: #e7e7e4;
+  --color-line-strong: #d6d6d2;
+  --color-mist: #f5f5f3;
+  --color-paper: #ffffff;
+  --color-warn: #8a5312;
+  --color-warn-soft: #fbf4e8;
+  --color-ok: #2e6b4e;
+  --color-ok-soft: #eef5f0;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.375rem;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.04), 0 24px 48px -24px rgb(0 0 0 / 0.25);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.4s ease both;
+  --animate-scan: scan 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-soft: pulse-soft 1.8s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scan {
+  0% {
+    transform: translateY(-10%);
+  }
+  50% {
+    transform: translateY(1000%);
+  }
+  100% {
+    transform: translateY(-10%);
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Range inputs: a thin line and a precise black knob. */
+input[type="range"].range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"].range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--color-ink) 0%,
+    var(--color-ink) var(--fill, 50%),
+    var(--color-line-strong) var(--fill, 50%)
+  );
+}
+input[type="range"].range::-moz-range-track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-line-strong);
+}
+input[type="range"].range::-moz-range-progress {
+  height: 2px;
+  background: var(--color-ink);
+}
+input[type="range"].range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -7px;
+  border-radius: 999px;
+  background: var(--color-paper);
+  border: 1.5px solid var(--color-ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  transition: transform 0.15s ease;
+}
+input[type="range"].range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-paper);
+  border: 1.5px solid var(--color-ink);
+}
+input[type="range"].range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+input[type="range"].range:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-mist) 0%, #ececea 50%, var(--color-mist) 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+.checker {
+  background-color: var(--color-mist);
+  background-image:
+    linear-gradient(45deg, #efefec 25%, transparent 25%), linear-gradient(-45deg, #efefec 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #efefec 75%), linear-gradient(-45deg, transparent 75%, #efefec 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
