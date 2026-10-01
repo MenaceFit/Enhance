@@ -138,6 +138,14 @@ def segment_garment(img: np.ndarray) -> tuple[np.ndarray, Segmentation, list[BBo
             pass
 
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    confidence = float(np.clip((separability - 0.6) / 1.6, 0.0, 1.0))
+    return _finalize(mask, (w0, h0), confidence, method)
+
+
+def _finalize(mask: np.ndarray, out_size: tuple[int, int], confidence: float, method: str):
+    """Common post-processing for any segmenter: components, holes, bbox, touches, confidence."""
+    sh, sw = mask.shape
+    w0, h0 = out_size
     mask, components = _keep_main_components(mask)
     filled = _fill_holes(mask)
 
@@ -146,22 +154,19 @@ def segment_garment(img: np.ndarray) -> tuple[np.ndarray, Segmentation, list[BBo
     holes = cv2.subtract(filled, mask)
     if holes.any():
         n, labels, stats, _ = cv2.connectedComponentsWithStats(holes, connectivity=8)
+        big = np.zeros_like(holes)
         for i in range(1, n):
             x, y, w, h, a = stats[i]
             ratio = a / garment_area
             # Large enclosed regions are legitimate (between arm and body); only report small ones.
             if 0.0002 <= ratio <= 0.01 and max(w, h) < 4 * max(1, min(w, h)):
                 holes_bbox.append(BBox(x / sw, y / sh, w / sw, h / sh))
-        # keep big enclosed background regions out of the garment mask
-        big = np.zeros_like(holes)
-        for i in range(1, n):
-            if stats[i, cv2.CC_STAT_AREA] / garment_area > 0.01:
-                big[labels == i] = 255
+            if ratio > 0.01:
+                big[labels == i] = 255  # keep big enclosed background regions out of the garment
         filled = cv2.subtract(filled, big)
 
     mask = filled
     fraction = float((mask > 0).mean())
-
     ys, xs = np.nonzero(mask)
     if xs.size == 0:
         bbox = BBox(0.0, 0.0, 1.0, 1.0)
@@ -177,7 +182,6 @@ def segment_garment(img: np.ndarray) -> tuple[np.ndarray, Segmentation, list[BBo
             "bottom": bool(y1 >= sh - 1 - tol),
         }
 
-    confidence = float(np.clip((separability - 0.6) / 1.6, 0.0, 1.0))
     if fraction < 0.03 or fraction > 0.93:
         confidence *= 0.3
     if sum(touches.values()) >= 3:
@@ -186,7 +190,6 @@ def segment_garment(img: np.ndarray) -> tuple[np.ndarray, Segmentation, list[BBo
     # Soft edges at full resolution; renderers refine further with a guided filter.
     mask_full = cv2.resize(mask, (w0, h0), interpolation=cv2.INTER_LINEAR)
     mask_full = cv2.GaussianBlur(mask_full, (0, 0), max(0.8, max(h0, w0) / 1400))
-
     info = Segmentation(
         confidence=round(confidence, 3),
         garment_fraction=round(fraction, 4),
@@ -196,6 +199,17 @@ def segment_garment(img: np.ndarray) -> tuple[np.ndarray, Segmentation, list[BBo
         method=method,
     )
     return mask_full, info, holes_bbox
+
+
+def segmentation_from_mask(mask: np.ndarray, out_size: tuple[int, int], method: str, confidence: float):
+    """Adapter for external segmenters (rembg, SAM, cloud APIs) returning a soft mask."""
+    small = mask if max(mask.shape) <= WORK_SIZE else cv2.resize(
+        mask, (round(mask.shape[1] * WORK_SIZE / max(mask.shape)), round(mask.shape[0] * WORK_SIZE / max(mask.shape))),
+        interpolation=cv2.INTER_AREA,
+    )
+    binary = (small > 127).astype(np.uint8) * 255
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    return _finalize(binary, out_size, confidence, method)
 
 
 def quick_mask(img: np.ndarray) -> np.ndarray:

@@ -55,6 +55,10 @@ class ImageEnhancementProvider(ABC):  # noqa: B024 - capabilities are opt-in, no
     def model_for(self, capability: Capability) -> str | None:
         return None
 
+    def call_cost(self, capability: Capability) -> float:
+        """Cost of the call that just finished (providers with usage-based billing override this)."""
+        return float(self.cost_cents.get(capability, 0.0))
+
     def describe(self) -> dict[str, Any]:
         return {
             "name": self.name,

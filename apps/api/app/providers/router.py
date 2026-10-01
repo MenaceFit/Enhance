@@ -107,7 +107,7 @@ class ProviderRouter:
                 duration_ms=round((time.perf_counter() - t0) * 1000, 1),
                 provider=provider.name,
                 model=provider.model_for(capability),
-                cost_cents=float(provider.cost_cents.get(capability, 0.0)) if success else 0.0,
+                cost_cents=provider.call_cost(capability) if success else 0.0,
                 details=d,
             )
         )
