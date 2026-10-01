@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: vai, POSTGRES_PASSWORD: vai, POSTGRES_DB: vai }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vai" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install
+        run: uv venv .venv && uv pip install -e ".[dev,stripe,anthropic]"
+      - name: Lint
+        run: .venv/bin/ruff check app tests scripts
+      - name: Migrations apply cleanly and match the models
+        env: { DATABASE_URL: "postgresql+psycopg://vai:vai@localhost:5432/vai" }
+        run: .venv/bin/alembic upgrade head && .venv/bin/alembic check && .venv/bin/alembic downgrade base
+      - name: Tests (SQLite)
+        run: .venv/bin/python -m pytest
+      - name: API tests (PostgreSQL)
+        env: { TEST_DATABASE_URL: "postgresql+psycopg://vai:vai@localhost:5432/vai" }
+        run: .venv/bin/python -m pytest tests/test_api.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
+      - run: npm ci
+      - run: npx eslint .
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env: { NEXT_TELEMETRY_DISABLED: "1" }
+
+  e2e:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
+      - name: Start API (SQLite, in-process queue)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: sqlite:///./var/e2e.db
+          JOB_BACKEND: inline
+          CORS_ORIGINS: http://localhost:3000
+        run: |
+          uv venv .venv && uv pip install -e .
+          nohup .venv/bin/uvicorn app.main:app --port 8000 > api.log 2>&1 &
+      - name: Build and start web
+        working-directory: apps/web
+        env: { NEXT_TELEMETRY_DISABLED: "1", API_URL: "http://localhost:8000" }
+        run: |
+          npm ci && npm run build
+          cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+          (cd .next/standalone && PORT=3000 nohup node server.js > ../../web.log 2>&1 &)
+          npx playwright install --with-deps chromium
+          for i in $(seq 1 30); do curl -fs http://localhost:3000/api/v1/health && break; sleep 1; done
+      - name: Browser journey
+        working-directory: apps/web
+        run: npx playwright test
+      - name: Logs on failure
+        if: failure()
+        run: tail -100 apps/api/api.log apps/web/web.log || true

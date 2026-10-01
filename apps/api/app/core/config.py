@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     local_storage_path: Path = API_ROOT / "var" / "storage"
     s3_bucket: str = "vinted-ai"
     s3_endpoint_url: str | None = None  # e.g. https://<account>.r2.cloudflarestorage.com or MinIO
+    s3_public_endpoint_url: str | None = None  # host used in presigned URLs when it differs (Docker/MinIO)
     s3_region: str = "auto"
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None

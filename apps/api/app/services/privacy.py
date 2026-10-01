@@ -9,7 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.storage import get_storage, user_prefix
+from app.core.storage import get_storage, renders_prefix, user_prefix
 from app.models import Consent, Job, Photo, User
 from app.services.photos import source_cache
 
@@ -17,7 +17,9 @@ log = logging.getLogger(__name__)
 
 
 def delete_photo(db: Session, photo: Photo) -> None:
-    get_storage().delete_prefix(photo.storage_prefix)
+    st = get_storage()
+    st.delete_prefix(photo.storage_prefix)
+    st.delete_prefix(renders_prefix(photo.user_id, photo.id))
     source_cache.drop(photo.id)
     db.delete(photo)
 
@@ -26,7 +28,7 @@ def delete_account(db: Session, user: User) -> int:
     """Erase every file and row belonging to the user (right to erasure)."""
     st = get_storage()
     prefix = user_prefix(user.id)
-    removed = st.delete_prefix(prefix)
+    removed = st.delete_prefix(prefix) + st.delete_prefix(renders_prefix(user.id))
     # photos inherited from a guest session keep their original storage prefix
     for p in db.scalars(select(Photo).where(Photo.user_id == user.id)):
         if not p.storage_prefix.startswith(prefix):
@@ -71,7 +73,7 @@ def purge_expired(db: Session, now: datetime | None = None) -> dict[str, int]:
 def _purge_temporary(st, db: Session, cutoff: datetime) -> None:
     """Exports and editor preview renders are temporary.
 
-    On S3/R2, configure a lifecycle rule expiring ``*/renders/*`` after 1 day; the
+    On S3/R2, configure a lifecycle rule expiring the ``tmp/`` prefix after 1 day; the
     local backend is swept here.
     """
     import shutil
@@ -84,8 +86,8 @@ def _purge_temporary(st, db: Session, cutoff: datetime) -> None:
         db.delete(e)
     db.commit()
     if isinstance(st, LocalStorage):
-        users_dir = st.path_for("users")
-        if users_dir.is_dir():
-            for renders in users_dir.glob("*/photos/*/renders/*"):
+        tmp_dir = st.path_for("tmp/renders")
+        if tmp_dir.is_dir():
+            for renders in tmp_dir.glob("*/*/*"):
                 if renders.is_dir() and datetime.fromtimestamp(renders.stat().st_mtime, UTC) < cutoff:
                     shutil.rmtree(renders, ignore_errors=True)

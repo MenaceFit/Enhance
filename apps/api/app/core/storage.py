@@ -118,14 +118,19 @@ class S3Storage(Storage):
         self.bucket = cfg.s3_bucket
         self.sse = cfg.s3_server_side_encryption
         self.default_ttl = cfg.signed_url_ttl_seconds
-        self.client = boto3.client(
-            "s3",
-            endpoint_url=cfg.s3_endpoint_url,
-            region_name=cfg.s3_region,
-            aws_access_key_id=cfg.s3_access_key_id,
-            aws_secret_access_key=cfg.s3_secret_access_key,
-            config=Config(signature_version="s3v4", retries={"max_attempts": 4, "mode": "standard"}),
-        )
+        def make(endpoint):
+            return boto3.client(
+                "s3",
+                endpoint_url=endpoint,
+                region_name=cfg.s3_region,
+                aws_access_key_id=cfg.s3_access_key_id,
+                aws_secret_access_key=cfg.s3_secret_access_key,
+                config=Config(signature_version="s3v4", retries={"max_attempts": 4, "mode": "standard"}),
+            )
+
+        self.client = make(cfg.s3_endpoint_url)
+        # The signature covers the host: sign with the endpoint the *browser* will use.
+        self.signer = make(cfg.s3_public_endpoint_url) if cfg.s3_public_endpoint_url else self.client
 
     def put(self, key, data, content_type=None):
         extra = {"ContentType": content_type or mimetypes.guess_type(key)[0] or "application/octet-stream"}
@@ -160,7 +165,7 @@ class S3Storage(Storage):
         params = {"Bucket": self.bucket, "Key": key}
         if download_name:
             params["ResponseContentDisposition"] = f'attachment; filename="{download_name}"'
-        return self.client.generate_presigned_url("get_object", Params=params, ExpiresIn=ttl or self.default_ttl)
+        return self.signer.generate_presigned_url("get_object", Params=params, ExpiresIn=ttl or self.default_ttl)
 
     def copy(self, src, dst):
         extra = {"ServerSideEncryption": self.sse} if self.sse else {}
@@ -177,3 +182,10 @@ def get_storage() -> Storage:
 
 def user_prefix(user_id) -> str:
     return f"users/{user_id}/"
+
+
+def renders_prefix(user_id, photo_id=None) -> str:
+    """Temporary editor previews live under ``tmp/`` so that an object-storage lifecycle
+    rule (expire after 1 day) cleans them up; erasure also deletes them immediately."""
+    base = f"tmp/renders/{user_id}/"
+    return f"{base}{photo_id}/" if photo_id else base

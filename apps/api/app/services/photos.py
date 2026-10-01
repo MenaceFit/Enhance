@@ -17,7 +17,7 @@ from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.storage import get_storage, user_prefix
+from app.core.storage import get_storage, renders_prefix, user_prefix
 from app.imaging.image_io import (
     ImageDecodeError,
     decode_mask,
@@ -278,7 +278,7 @@ def preview_render(photo: Photo, settings: EnhancementSettings) -> dict:
     st = get_storage()
     consistency = (photo.analysis or {}).get("consistency")
     variant = hashlib.sha1(json.dumps(consistency, sort_keys=True).encode()).hexdigest()[:8] if consistency else "solo"
-    prefix = f"{photo.storage_prefix}renders/{settings.cache_key()}-{variant}/"
+    prefix = f"{renders_prefix(photo.user_id, photo.id)}{settings.cache_key()}-{variant}/"
     meta_key = f"{prefix}metrics.json"
     if st.exists(meta_key):
         payload = json.loads(st.get(meta_key))

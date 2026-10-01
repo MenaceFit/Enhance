@@ -30,7 +30,7 @@ dependencies = [
 anthropic = ["anthropic>=0.70"]
 rembg = ["rembg>=2.0.57", "onnxruntime>=1.18"]
 stripe = ["stripe>=10.0"]
-dev = ["pytest>=8.2", "ruff>=0.6"]
+dev = ["pytest>=8.2", "ruff>=0.6", "moto[s3]>=5.0"]
 
 [build-system]
 requires = ["hatchling"]
