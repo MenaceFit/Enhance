@@ -24,7 +24,7 @@ Upload → Analyse IA → Amélioration → Avant/Après → Réglages → Expor
 
 ### Sans Docker (développement)
 
-Prérequis : Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20.9+.
+Prérequis : Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20.9+. **Tutoriel détaillé pas à pas (Windows, macOS, Linux) : [`INSTALL.md`](INSTALL.md).**
 
 ```bash
 make install            # dépendances API + web

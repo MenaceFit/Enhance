@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     public_app_url: str = "http://localhost:3000"
     api_prefix: str = "/api/v1"
     secret_key: str = Field(default="dev-insecure-change-me-please-0123456789", min_length=32)
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     log_level: str = "INFO"
 
     # --- database ----------------------------------------------------------------------
@@ -120,6 +120,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     s = Settings()
-    if s.is_production and s.secret_key.startswith("dev-insecure"):
-        raise RuntimeError("SECRET_KEY must be set in production")
+    if s.is_production and s.secret_key.startswith(("dev-insecure", "change-me")):
+        raise RuntimeError("SECRET_KEY must be set to a random value in production")
     return s
