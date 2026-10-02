@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # --- billing -----------------------------------------------------------------------
     stripe_secret_key: str | None = None
     stripe_webhook_secret: str | None = None
-    stripe_price_ids: dict[str, str] = {}  # plan code → Stripe price id
+    stripe_price_ids: Annotated[dict[str, str], NoDecode] = {}  # plan code → Stripe price id (JSON)
 
     # --- AI providers ------------------------------------------------------------------
     ai_routing: str = "{}"  # JSON: {"segmentation": "rembg", "clothing_detection": "anthropic", "*": "local"}
@@ -93,6 +93,15 @@ class Settings(BaseSettings):
     replicate_api_token: str | None = None
     replicate_upscale_version: str | None = None
     rembg_model: str = "isnet-general-use"
+
+    @field_validator("stripe_price_ids", mode="before")
+    @classmethod
+    def _parse_price_ids(cls, v):
+        if isinstance(v, str):
+            import json
+
+            return json.loads(v) if v.strip() else {}
+        return v
 
     @field_validator("admin_emails", mode="before")
     @classmethod

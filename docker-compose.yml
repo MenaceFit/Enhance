@@ -1,6 +1,9 @@
-# Full stack: PostgreSQL, Redis, MinIO (S3-compatible), API, workers, scheduler, web.
-#   cp .env.example .env && docker compose up --build
+# Full stack: PostgreSQL, Redis, API, Celery worker + scheduler, web.
+#   cp .env.example .env   (set SECRET_KEY and ADMIN_EMAILS)
+#   docker compose up --build
 # Then open http://localhost:3000 (API docs: http://localhost:8000/api/docs).
+# Photos are stored privately in the "storage" volume; set STORAGE_BACKEND=s3 and the
+# S3_* variables in .env to use AWS S3 / Cloudflare R2 instead.
 x-api-env: &api-env
   ENVIRONMENT: ${ENVIRONMENT:-development}
   SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
@@ -8,14 +11,15 @@ x-api-env: &api-env
   AUTO_CREATE_SCHEMA: "false"
   JOB_BACKEND: celery
   REDIS_URL: redis://redis:6379/0
-  STORAGE_BACKEND: s3
-  S3_ENDPOINT_URL: http://minio:9000
-  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
-  S3_BUCKET: vinted-ai
-  S3_REGION: us-east-1
-  S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-  S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio-secret-key}
-  S3_SERVER_SIDE_ENCRYPTION: ""
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+  LOCAL_STORAGE_PATH: /app/var/storage
+  S3_BUCKET: ${S3_BUCKET:-vinted-ai}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-}
+  S3_REGION: ${S3_REGION:-auto}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+  S3_SERVER_SIDE_ENCRYPTION: ${S3_SERVER_SIDE_ENCRYPTION:-}
   PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
@@ -25,6 +29,9 @@ x-api-env: &api-env
   REPLICATE_UPSCALE_VERSION: ${REPLICATE_UPSCALE_VERSION:-}
   STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
   STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  STRIPE_PRICE_IDS: ${STRIPE_PRICE_IDS:-}
+  GUEST_CREDITS: ${GUEST_CREDITS:-3}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
   DEFAULT_RETENTION_DAYS: ${DEFAULT_RETENTION_DAYS:-30}
   COOKIE_SECURE: ${COOKIE_SECURE:-false}
 
@@ -34,32 +41,13 @@ services:
     environment: { POSTGRES_USER: vai, POSTGRES_PASSWORD: vai, POSTGRES_DB: vai }
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U vai"], interval: 5s, retries: 10 }
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10 }
-
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-secret-key}
-    volumes: [miniodata:/data]
-    ports: ["9000:9000", "9001:9001"]
-    healthcheck: { test: ["CMD", "mc", "ready", "local"], interval: 5s, retries: 10 }
-
-  minio-init:
-    image: minio/mc:latest
-    depends_on: { minio: { condition: service_healthy } }
-    entrypoint: >
-      /bin/sh -c "mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-minio} $${MINIO_ROOT_PASSWORD:-minio-secret-key} &&
-      mc mb --ignore-existing local/vinted-ai && mc anonymous set none local/vinted-ai &&
-      mc ilm rule add --prefix 'tmp/' --expire-days 1 local/vinted-ai || true"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-secret-key}
+    restart: unless-stopped
 
   migrate:
     build: ./apps/api
@@ -70,25 +58,32 @@ services:
   api:
     build: ./apps/api
     environment: *api-env
+    volumes: [storage:/app/var/storage]
     ports: ["8000:8000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
-      minio-init: { condition: service_completed_successfully }
+    restart: unless-stopped
 
   worker:
     build: ./apps/api
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=INFO", "--concurrency=${WORKER_CONCURRENCY:-4}"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=INFO", "--concurrency=${WORKER_CONCURRENCY:-2}"]
     environment: *api-env
+    volumes: [storage:/app/var/storage]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
+    restart: unless-stopped
 
   beat:
     build: ./apps/api
     command: ["celery", "-A", "app.workers.celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
     environment: *api-env
-    depends_on: { redis: { condition: service_healthy } }
+    volumes: [storage:/app/var/storage]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
 
   web:
     build:
@@ -97,7 +92,8 @@ services:
     environment: { API_URL: http://api:8000 }
     ports: ["3000:3000"]
     depends_on: [api]
+    restart: unless-stopped
 
 volumes:
   pgdata:
-  miniodata:
+  storage:

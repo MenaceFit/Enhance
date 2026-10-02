@@ -11,7 +11,7 @@ Deux méthodes au choix :
 |---|---|---|
 | Pour qui | tout le monde, pas besoin de savoir coder | pour modifier le code |
 | À installer | Docker Desktop | Node.js + uv |
-| Contenu | stack complète : PostgreSQL, Redis, stockage S3 (MinIO), workers | base SQLite et fichiers locaux, tout dans un dossier |
+| Contenu | stack complète : PostgreSQL, Redis, workers de traitement | base SQLite et fichiers locaux, tout dans un dossier |
 | Durée | ~10 min (premier lancement) | ~10 min |
 
 Les deux méthodes fonctionnent sur **Windows 10/11, macOS (Intel ou Apple Silicon) et Linux**. Il faut environ **4 Go de RAM libres** et **5 Go d'espace disque**.
@@ -83,7 +83,7 @@ Le premier lancement télécharge et construit tout : compte **5 à 10 minutes**
 | Après une mise à jour du code | `docker compose up --build` |
 | **Tout effacer** (base, photos) | `docker compose down -v` |
 
-Les données (comptes, photos) sont conservées entre deux lancements. La console du stockage MinIO est accessible sur http://localhost:9001 (identifiant `minio`, mot de passe `minio-secret-key`, modifiables dans `.env`).
+Les données (comptes dans PostgreSQL, photos dans un volume Docker privé) sont conservées entre deux lancements.
 
 ---
 
@@ -170,7 +170,7 @@ Le moteur d'amélioration intégré fonctionne **sans aucune clé** et sans coû
 
 1. Un serveur (VPS) avec Docker, et un nom de domaine pointant dessus.
 2. Dans `.env` : `ENVIRONMENT=production`, une vraie `SECRET_KEY`, `PUBLIC_APP_URL=https://ton-domaine.fr`, `CORS_ORIGINS=https://ton-domaine.fr` et `COOKIE_SECURE=true`.
-3. Le stockage : un bucket S3 / Cloudflare R2 privé (variables `S3_*`), avec une règle de cycle de vie qui supprime le préfixe `tmp/` après 1 jour. Avec MinIO, mets `S3_PUBLIC_ENDPOINT_URL` sur une adresse publique en HTTPS.
+3. Le stockage : par défaut, les photos restent dans le volume Docker du serveur (pense à le sauvegarder). Pour un bucket S3 / Cloudflare R2 privé, mets `STORAGE_BACKEND=s3` et les variables `S3_*`, avec une règle de cycle de vie qui supprime le préfixe `tmp/` après 1 jour.
 4. Un reverse proxy HTTPS (Caddy, Nginx, Traefik) devant le port 3000.
 5. `docker compose up -d --build`.
 
@@ -184,10 +184,9 @@ Plus de détails dans `README.md` et `docs/ARCHITECTURE.md`.
 |---|---|
 | `Cannot connect to the Docker daemon` / `docker: command not found` | Docker Desktop n'est pas lancé, ou pas installé. Lance-le et attends « Docker is running ». |
 | `set SECRET_KEY in .env` | Le fichier `.env` n'existe pas ou n'est pas dans le dossier `vinted-ai` (voir l'étape commune). |
-| `port is already allocated` / `address already in use` | Un autre programme utilise le port 3000, 8000 ou 9000. Ferme-le, ou change le premier nombre de la ligne `ports` dans `docker-compose.yml` (par exemple `"3001:3000"`). |
+| `port is already allocated` / `address already in use` | Un autre programme utilise le port 3000 ou 8000. Ferme-le, ou change le premier nombre de la ligne `ports` dans `docker-compose.yml` (par exemple `"3001:3000"`), puis ouvre le site sur ce nouveau port. |
 | `uv` ou `npm` « n'est pas reconnu » | Ferme et rouvre le terminal après l'installation. Sur Windows, redémarre si besoin. |
-| « Origine non autorisée » à l'envoi d'une photo | Ouvre le site via http://localhost:3000. Pour une autre adresse (par exemple l'IP de ta machine), ajoute-la à `CORS_ORIGINS` dans `.env` puis redémarre. |
-| Les photos ne s'affichent pas (méthode A, depuis un autre appareil) | Mets l'IP de ta machine dans `S3_PUBLIC_ENDPOINT_URL=http://IP:9000`, `PUBLIC_APP_URL=http://IP:3000` et `CORS_ORIGINS`, puis `docker compose up`. |
+| « Origine non autorisée » à l'envoi d'une photo | Ouvre le site via http://localhost:3000. Pour y accéder depuis un autre appareil avec la méthode A (par exemple ton téléphone sur le même Wi-Fi via `http://IP-de-ton-ordinateur:3000`), ajoute cette adresse à `CORS_ORIGINS` dans `.env` (séparée par une virgule), puis redémarre. |
 | « Tu as utilisé tous tes crédits » | Crée un compte (5 photos par mois), choisis une offre dans **Abonnement**, ou ajoute des crédits depuis l'Administration. |
 | Le premier lancement Docker est long | C'est normal : téléchargement des images et construction. Les lancements suivants sont rapides. |
 | Repartir de zéro | Méthode A : `docker compose down -v`. Méthode B : supprime `apps/api/var/`. |

@@ -41,7 +41,7 @@ cp .env.example .env    # renseigne au minimum SECRET_KEY
 docker compose up --build
 ```
 
-Services : PostgreSQL, Redis, MinIO (S3), migration Alembic, API, worker Celery, Celery beat (purge RGPD), web. Ouvre http://localhost:3000.
+Services : PostgreSQL, Redis, migration Alembic, API, worker Celery, Celery beat (purge RGPD), web ; photos dans un volume Docker privé (ou S3/R2 via `STORAGE_BACKEND=s3`). Ouvre http://localhost:3000.
 
 ### Commandes utiles
 
@@ -108,6 +108,7 @@ apps/
   web/                      Next.js (landing, app, admin), e2e Playwright
 docs/ARCHITECTURE.md        conception détaillée
 docker-compose.yml          stack complète
+INSTALL.md                  tutoriel d'installation pas à pas
 ```
 
 ## Configuration

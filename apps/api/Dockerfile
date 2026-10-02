@@ -14,7 +14,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY scripts ./scripts
-RUN useradd --create-home --uid 10001 app && mkdir -p /app/var && chown -R app /app/var
+RUN useradd --create-home --uid 10001 app && mkdir -p /app/var/storage && chown -R app /app/var
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)" || exit 1
