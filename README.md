@@ -22,6 +22,10 @@ Upload → Analyse IA → Amélioration → Avant/Après → Réglages → Expor
 
 ## Démarrage rapide
 
+### Windows : un double-clic
+
+Décompresse le projet puis double-clique sur **`installer.bat`** : il configure `.env`, utilise Docker Desktop s'il est installé ou, sinon, installe lui-même Python (via uv) et Node.js, puis ouvre http://localhost:3000. Ensuite : `demarrer.bat` et `arreter.bat`. Détails dans [`INSTALL.md`](INSTALL.md).
+
 ### Sans Docker (développement)
 
 Prérequis : Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20.9+. **Tutoriel détaillé pas à pas (Windows, macOS, Linux) : [`INSTALL.md`](INSTALL.md).**
@@ -109,6 +113,7 @@ apps/
 docs/ARCHITECTURE.md        conception détaillée
 docker-compose.yml          stack complète
 INSTALL.md                  tutoriel d'installation pas à pas
+installer.bat               installation Windows en un double-clic (+ demarrer.bat, arreter.bat)
 ```
 
 ## Configuration

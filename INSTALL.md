@@ -18,6 +18,36 @@ Les deux méthodes fonctionnent sur **Windows 10/11, macOS (Intel ou Apple Silic
 
 ---
 
+## Windows : installation en un double-clic
+
+1. **Décompresse** `vinted-ai.zip` : clic droit → **Extraire tout…**. Si Windows crée un dossier `vinted-ai` dans un autre dossier `vinted-ai`, ouvre celui qui contient `installer.bat`.
+2. **Double-clique sur `installer.bat`**.
+   - Si Windows affiche « Windows a protégé votre ordinateur », clique sur **Informations complémentaires** → **Exécuter quand même** (c'est l'avertissement habituel pour un fichier qui vient d'un zip téléchargé).
+3. **Indique ton adresse e-mail** quand elle est demandée : le compte que tu créeras avec cette adresse aura accès à l'administration. Ensuite, laisse faire.
+
+Le script :
+
+- crée le fichier `.env` et y génère une clé secrète ;
+- utilise **Docker Desktop s'il est installé** (méthode A, il le démarre si besoin) ;
+- sinon, installe lui-même **uv** (qui fournit Python), **Node.js LTS** (via winget ; Windows peut demander une autorisation) puis l'application (méthode B) ;
+- ouvre **http://localhost:3000** dans ton navigateur dès que le site est prêt.
+
+Compte 5 à 10 minutes la première fois. Ensuite, utilise ces fichiers :
+
+| Fichier | Rôle |
+|---|---|
+| `demarrer.bat` | relancer le site, sans réinstaller |
+| `arreter.bat` | arrêter le site (comptes et photos conservés) |
+| `installer.bat` | à relancer après une mise à jour du code |
+
+Sans Docker, le site tourne dans la fenêtre ouverte par le script : **garde-la ouverte** pendant que tu l'utilises, la fermer arrête le site. Si Windows demande d'autoriser Node.js dans le pare-feu, tu peux accepter ou annuler : le site fonctionne dans les deux cas sur ton ordinateur.
+
+Pour choisir la méthode toi-même, lance depuis un terminal ouvert dans le dossier : `installer.bat docker` ou `installer.bat local`.
+
+La suite de ce tutoriel décrit l'installation manuelle (macOS, Linux, ou Windows si tu préfères tout contrôler).
+
+---
+
 ## Étape commune : décompresser et ouvrir un terminal
 
 1. **Décompresse** `vinted-ai.zip`. Tu obtiens un dossier `vinted-ai`.
@@ -182,6 +212,9 @@ Plus de détails dans `README.md` et `docs/ARCHITECTURE.md`.
 
 | Problème | Solution |
 |---|---|
+| « Windows a protégé votre ordinateur » au lancement de `installer.bat` | Clique sur **Informations complémentaires** → **Exécuter quand même**. |
+| `installer.bat` dit de décompresser le zip | Tu l'as lancé depuis l'intérieur du zip : fais clic droit sur le zip → **Extraire tout…**, puis lance `installer.bat` dans le dossier extrait. |
+| `installer.bat` n'arrive pas à installer Node.js | Installe la version LTS depuis https://nodejs.org, puis relance `installer.bat`. |
 | `Cannot connect to the Docker daemon` / `docker: command not found` | Docker Desktop n'est pas lancé, ou pas installé. Lance-le et attends « Docker is running ». |
 | `set SECRET_KEY in .env` | Le fichier `.env` n'existe pas ou n'est pas dans le dossier `vinted-ai` (voir l'étape commune). |
 | `port is already allocated` / `address already in use` | Un autre programme utilise le port 3000 ou 8000. Ferme-le, ou change le premier nombre de la ligne `ports` dans `docker-compose.yml` (par exemple `"3001:3000"`), puis ouvre le site sur ce nouveau port. |
@@ -189,7 +222,7 @@ Plus de détails dans `README.md` et `docs/ARCHITECTURE.md`.
 | « Origine non autorisée » à l'envoi d'une photo | Ouvre le site via http://localhost:3000. Pour y accéder depuis un autre appareil avec la méthode A (par exemple ton téléphone sur le même Wi-Fi via `http://IP-de-ton-ordinateur:3000`), ajoute cette adresse à `CORS_ORIGINS` dans `.env` (séparée par une virgule), puis redémarre. |
 | « Tu as utilisé tous tes crédits » | Crée un compte (5 photos par mois), choisis une offre dans **Abonnement**, ou ajoute des crédits depuis l'Administration. |
 | Le premier lancement Docker est long | C'est normal : téléchargement des images et construction. Les lancements suivants sont rapides. |
-| Repartir de zéro | Méthode A : `docker compose down -v`. Méthode B : supprime `apps/api/var/`. |
+| Repartir de zéro | Méthode A : `docker compose down -v`. Méthode B : arrête le site puis supprime `apps/api/var/`. |
 
 ### Pour les développeurs
 

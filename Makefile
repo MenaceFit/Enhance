@@ -33,5 +33,5 @@ demo-assets:        ## regenerate the landing-page before/after pairs with the r
 benchmark:          ## compare AI provider profiles on synthetic images
 	cd apps/api && .venv/bin/python -m app.benchmark --profiles local --synthetic 10
 
-up:                 ## full stack with Docker (Postgres, Redis, MinIO, API, workers, web)
+up:                 ## full stack with Docker (Postgres, Redis, API, workers, web)
 	docker compose up --build

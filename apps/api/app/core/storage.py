@@ -16,6 +16,7 @@ import hmac
 import mimetypes
 import shutil
 import time
+import uuid
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
@@ -69,9 +70,17 @@ class LocalStorage(Storage):
     def put(self, key, data, content_type=None):
         p = self._path(key)
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp = p.with_name(f"{p.name}.{uuid.uuid4().hex}.tmp")
         tmp.write_bytes(data)
-        tmp.replace(p)
+        for attempt in range(6):
+            try:
+                tmp.replace(p)
+                return
+            except PermissionError:  # Windows: the target is open by a concurrent reader
+                if attempt == 5:
+                    tmp.unlink(missing_ok=True)
+                    raise
+                time.sleep(0.05 * (attempt + 1))
 
     def get(self, key):
         return self._path(key).read_bytes()

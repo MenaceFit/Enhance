@@ -31,3 +31,6 @@ apps/api/*.db
 # Playwright
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Windows installer state
+/.install-mode
