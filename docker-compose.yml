@@ -67,6 +67,7 @@ services:
 
   worker:
     build: ./apps/api
+    healthcheck: { disable: true }  # the image healthcheck probes the HTTP API, which only "api" serves
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=INFO", "--concurrency=${WORKER_CONCURRENCY:-2}"]
     environment: *api-env
     volumes: [storage:/app/var/storage]
@@ -77,6 +78,7 @@ services:
 
   beat:
     build: ./apps/api
+    healthcheck: { disable: true }  # the image healthcheck probes the HTTP API, which only "api" serves
     command: ["celery", "-A", "app.workers.celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
     environment: *api-env
     volumes: [storage:/app/var/storage]
